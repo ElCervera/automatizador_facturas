@@ -1,113 +1,66 @@
 """
-Automatizador de Facturas - Programa Principal
-
-Este script coordina el flujo de trabajo para:
-1. Descomprimir archivos ZIP de facturas electrónicas
-2. Procesar los archivos XML
-3. Aplicar reglas de conversión por proveedor
-4. Generar un archivo Excel consolidado
+Automatizador de Facturas — Fase 1:
+Descomprime ZIPs, extrae XMLs y muestra su contenido por consola.
 """
 import os
 import zipfile
-import glob
-from datetime import datetime
-from utils.lector_xml import procesar_xml, aplicar_reglas_conversion, generar_excel, cargar_reglas_conversion
+from utils.lector_xml import procesar_xml, aplicar_reglas_conversion, cargar_reglas_conversion
 
-# Rutas principales
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-FACTURAS_ZIP_DIR = os.path.join(BASE_DIR, 'facturas_zip')
-FACTURAS_XML_DIR = os.path.join(BASE_DIR, 'facturas_xml')
-RESULTADOS_DIR = os.path.join(BASE_DIR, 'resultados')
+def extraer_zips(carpeta_zip, carpeta_xml):
+    """Extrae todos los ZIP y deja solo los archivos XML en facturas_xml."""
+    if not os.path.exists(carpeta_zip):
+        print(f"⚠️ La carpeta {carpeta_zip} no existe.")
+        return
 
-def descomprimir_facturas():
-    """
-    Descomprime todos los archivos ZIP en la carpeta facturas_zip
-    y los guarda en facturas_xml.
-    """
-    print("Descomprimiendo archivos ZIP...")
-    
-    # Obtener todos los archivos ZIP en la carpeta
-    archivos_zip = glob.glob(os.path.join(FACTURAS_ZIP_DIR, '*.zip'))
-    
-    if not archivos_zip:
-        print("No se encontraron archivos ZIP para procesar.")
-        return False
-    
-    # Descomprimir cada archivo ZIP
-    for archivo_zip in archivos_zip:
-        try:
-            with zipfile.ZipFile(archivo_zip, 'r') as zip_ref:
-                zip_ref.extractall(FACTURAS_XML_DIR)
-            print(f"Archivo {os.path.basename(archivo_zip)} descomprimido correctamente.")
-        except Exception as e:
-            print(f"Error al descomprimir {os.path.basename(archivo_zip)}: {e}")
-    
-    return True
+    os.makedirs(carpeta_xml, exist_ok=True)
+    zips_encontrados = False
 
-def procesar_facturas():
-    """
-    Procesa todos los archivos XML en la carpeta facturas_xml,
-    aplica las reglas de conversión y genera un Excel consolidado.
-    """
-    print("Procesando archivos XML...")
-    
-    # Cargar reglas de conversión
-    reglas = cargar_reglas_conversion()
-    
-    # Obtener todos los archivos XML en la carpeta
-    archivos_xml = glob.glob(os.path.join(FACTURAS_XML_DIR, '*.xml'))
-    
-    if not archivos_xml:
-        print("No se encontraron archivos XML para procesar.")
-        return False
-    
-    # Procesar cada archivo XML
-    datos_consolidados = []
-    for archivo_xml in archivos_xml:
-        try:
-            print(f"Procesando {os.path.basename(archivo_xml)}...")
-            datos_factura = procesar_xml(archivo_xml)
-            
-            if datos_factura:
-                # Aplicar reglas de conversión
-                datos_convertidos = aplicar_reglas_conversion(datos_factura, reglas)
-                datos_consolidados.extend(datos_convertidos)
-        except Exception as e:
-            print(f"Error al procesar {os.path.basename(archivo_xml)}: {e}")
-    
-    if not datos_consolidados:
-        print("No se pudo extraer información de ninguna factura.")
-        return False
-    
-    # Generar archivo Excel con los datos consolidados
-    fecha_actual = datetime.now().strftime('%Y%m%d_%H%M%S')
-    ruta_excel = os.path.join(RESULTADOS_DIR, f'facturas_consolidadas_{fecha_actual}.xlsx')
-    
-    if generar_excel(datos_consolidados, ruta_excel):
-        print(f"Archivo Excel generado correctamente: {os.path.basename(ruta_excel)}")
-        return True
-    else:
-        print("Error al generar el archivo Excel.")
-        return False
+    for archivo in os.listdir(carpeta_zip):
+        if archivo.lower().endswith(".zip"):
+            zips_encontrados = True
+            ruta_zip = os.path.join(carpeta_zip, archivo)
+            with zipfile.ZipFile(ruta_zip, "r") as zip_ref:
+                for nombre in zip_ref.namelist():
+                    if nombre.lower().endswith(".xml"):
+                        zip_ref.extract(nombre, carpeta_xml)
+                        print(f"📦 Extraído XML: {nombre}")
+                    elif nombre.lower().endswith(".pdf"):
+                        # Si prefieres eliminar los PDF tras extraerlos, puedes omitir esta línea:
+                        print(f"📄 Ignorado PDF: {nombre}")
+            print(f"✅ ZIP procesado: {archivo}")
+
+    if not zips_encontrados:
+        print("⚠️ No se encontraron archivos ZIP en la carpeta de entrada.")
 
 def main():
-    """
-    Función principal que coordina el flujo del programa.
-    """
-    print("=== AUTOMATIZADOR DE FACTURAS ===")
-    
-    # Verificar que existan las carpetas necesarias
-    for directorio in [FACTURAS_ZIP_DIR, FACTURAS_XML_DIR, RESULTADOS_DIR]:
-        if not os.path.exists(directorio):
-            os.makedirs(directorio)
-            print(f"Carpeta creada: {os.path.basename(directorio)}")
-    
-    # Paso 1: Descomprimir archivos ZIP
-    if descomprimir_facturas():
-        # Paso 2: Procesar facturas y generar Excel
-        procesar_facturas()
-    
-    print("Proceso completado.")
+    print("=== AUTOMATIZADOR DE FACTURAS — FASE 1 ===")
+
+    carpeta_zip = os.path.join(os.getcwd(), "facturas_zip")
+    carpeta_xml = os.path.join(os.getcwd(), "facturas_xml")
+
+    # Paso 1: Descomprimir ZIPs
+    extraer_zips(carpeta_zip, carpeta_xml)
+
+    # Paso 2: Leer y mostrar los XML procesados
+    print("\n📄 Leyendo XMLs extraídos...")
+    archivos_xml = [f for f in os.listdir(carpeta_xml) if f.lower().endswith(".xml")]
+
+    if not archivos_xml:
+        print("⚠️ No se encontraron XML para procesar.")
+        return
+
+    reglas = cargar_reglas_conversion()
+
+    for archivo in archivos_xml:
+        ruta = os.path.join(carpeta_xml, archivo)
+        print(f"\n🔍 Procesando XML: {archivo}")
+        factura = procesar_xml(ruta)
+        if factura:
+            datos_convertidos = aplicar_reglas_conversion(factura, reglas)
+            for item in datos_convertidos:
+                print(item)
+        else:
+            print(f"❌ Error al procesar {archivo}")
 
 if __name__ == "__main__":
     main()

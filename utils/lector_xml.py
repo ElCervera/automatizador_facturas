@@ -1,11 +1,13 @@
 """
 Módulo para leer y procesar archivos XML de facturas electrónicas de la DIAN.
+Actualizado: incluye NIT del proveedor, normalización de productos y fecha completa.
 """
 import os
 import xml.etree.ElementTree as ET
 import json
 import pandas as pd
 from datetime import datetime
+from utils.normalizador import normalizar_producto
 
 # Namespaces utilizados en los XML de la DIAN
 NAMESPACES = {
@@ -15,12 +17,7 @@ NAMESPACES = {
 }
 
 def cargar_reglas_conversion():
-    """
-    Carga las reglas de conversión desde el archivo JSON.
-    
-    Returns:
-        dict: Diccionario con las reglas de conversión por proveedor.
-    """
+    """Carga las reglas de conversión desde el archivo JSON."""
     ruta_reglas = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'reglas_conversion.json')
     with open(ruta_reglas, 'r', encoding='utf-8') as archivo:
         return json.load(archivo)
@@ -28,103 +25,89 @@ def cargar_reglas_conversion():
 def procesar_xml(ruta_xml):
     """
     Procesa un archivo XML de factura electrónica y extrae la información relevante.
-    
-    Args:
-        ruta_xml (str): Ruta al archivo XML a procesar.
-        
-    Returns:
-        dict: Diccionario con la información extraída del XML.
+    Devuelve un diccionario con los datos de la factura.
     """
     try:
-        # Parsear el archivo XML
         tree = ET.parse(ruta_xml)
         root = tree.getroot()
-        
-        # Extraer información básica de la factura
-        numero_factura = root.find('.//cbc:ID', NAMESPACES).text
-        fecha_emision = root.find('.//cbc:IssueDate', NAMESPACES).text
+
+        # Extraer información básica
+        numero_factura = root.findtext('.//cbc:ID', namespaces=NAMESPACES)
+        fecha_emision = root.findtext('.//cbc:IssueDate', namespaces=NAMESPACES)
         fecha_obj = datetime.strptime(fecha_emision, '%Y-%m-%d')
-        
+
         # Extraer información del proveedor
         proveedor_node = root.find('.//cac:AccountingSupplierParty', NAMESPACES)
-        nombre_proveedor = proveedor_node.find('.//cbc:RegistrationName', NAMESPACES).text
-        
+        nombre_proveedor = proveedor_node.findtext('.//cbc:RegistrationName', namespaces=NAMESPACES)
+        nit_proveedor = proveedor_node.findtext('.//cbc:CompanyID', namespaces=NAMESPACES)
+
         # Extraer información de los productos
         items = []
         for item_node in root.findall('.//cac:InvoiceLine', NAMESPACES):
             try:
-                descripcion = item_node.find('.//cbc:Description', NAMESPACES).text
-                cantidad = float(item_node.find('.//cbc:InvoicedQuantity', NAMESPACES).text)
-                precio_unitario = float(item_node.find('.//cac:Price/cbc:PriceAmount', NAMESPACES).text)
-                
+                descripcion = item_node.findtext('.//cbc:Description', namespaces=NAMESPACES)
+                descripcion_normalizada = normalizar_producto(descripcion)
+                cantidad = float(item_node.findtext('.//cbc:InvoicedQuantity', namespaces=NAMESPACES))
+                precio_unitario = float(item_node.findtext('.//cac:Price/cbc:PriceAmount', namespaces=NAMESPACES))
+
                 items.append({
-                    'descripcion': descripcion,
+                    'descripcion': descripcion_normalizada,
                     'cantidad': cantidad,
                     'precio_unitario': precio_unitario
                 })
             except (AttributeError, ValueError) as e:
-                print(f"Error al procesar ítem en factura {numero_factura}: {e}")
-        
+                print(f"⚠️ Error al procesar ítem en factura {numero_factura}: {e}")
+
         return {
+            'nit_proveedor': nit_proveedor,
             'proveedor': nombre_proveedor,
-            'dia': fecha_obj.day,
+            'fecha': fecha_obj.strftime('%d/%m/%Y'),
             'numero_factura': numero_factura,
-            'fecha': fecha_obj,
             'items': items
         }
-    
+
     except Exception as e:
-        print(f"Error al procesar el archivo {ruta_xml}: {e}")
+        print(f"❌ Error al procesar el archivo {ruta_xml}: {e}")
         return None
 
 def aplicar_reglas_conversion(datos_factura, reglas):
     """
-    Aplica las reglas de conversión a los datos de la factura.
-    
-    Args:
-        datos_factura (dict): Datos extraídos de la factura.
-        reglas (dict): Reglas de conversión por proveedor.
-        
-    Returns:
-        list: Lista de diccionarios con los datos convertidos.
+    Aplica las reglas de conversión (por proveedor) a los datos de la factura.
+    Devuelve una lista de diccionarios listos para exportar a Excel.
     """
     resultado = []
     proveedor = datos_factura['proveedor']
-    
-    # Verificar si hay reglas específicas para este proveedor
+    nit = datos_factura.get('nit_proveedor', 'N/A')
+
+    # Cargar la regla específica del proveedor, si existe
     regla_proveedor = reglas.get(proveedor, {'factor': 1, 'tipo_objetivo': 'Unidad'})
-    
+
     for item in datos_factura['items']:
-        # Aplicar factor de conversión si existe
         cantidad_convertida = item['cantidad'] * regla_proveedor.get('factor', 1)
         tipo = regla_proveedor.get('tipo_objetivo', 'Unidad')
-        
+
         resultado.append({
+            'NIT_PROVEEDOR': nit,
             'PROVEEDOR': proveedor,
-            'Dia': datos_factura['dia'],
+            'Fecha': datos_factura['fecha'],
             'N factura': datos_factura['numero_factura'],
-            'Tipo': tipo,
+            'Tipo': item['descripcion'],
             'Cantidad': cantidad_convertida,
-            'Valor Unitario': item['precio_unitario'] / regla_proveedor.get('factor', 1) if regla_proveedor.get('factor', 1) > 0 else item['precio_unitario']
+            'Valor Unitario': (
+                item['precio_unitario'] / regla_proveedor.get('factor', 1)
+                if regla_proveedor.get('factor', 1) > 0 else item['precio_unitario']
+            )
         })
-    
+
     return resultado
 
 def generar_excel(datos_procesados, ruta_salida):
-    """
-    Genera un archivo Excel con los datos procesados.
-    
-    Args:
-        datos_procesados (list): Lista de diccionarios con los datos procesados.
-        ruta_salida (str): Ruta donde se guardará el archivo Excel.
-        
-    Returns:
-        bool: True si se generó correctamente, False en caso contrario.
-    """
+    """Genera un archivo Excel con los datos procesados."""
     try:
         df = pd.DataFrame(datos_procesados)
         df.to_excel(ruta_salida, index=False)
+        print(f"✅ Archivo Excel generado correctamente en: {ruta_salida}")
         return True
     except Exception as e:
-        print(f"Error al generar el archivo Excel: {e}")
+        print(f"❌ Error al generar el archivo Excel: {e}")
         return False
