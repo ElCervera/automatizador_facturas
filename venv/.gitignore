@@ -1,4 +1,4 @@
-# Entorno virtual
+# Created by ve# Entorno virtual
 venv/
 .env
 
@@ -20,3 +20,5 @@ __pycache__/
 # Archivos del sistema
 .DS_Store
 Thumbs.db
+nv; see https://docs.python.org/3/library/venv.html
+*
