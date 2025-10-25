@@ -1,0 +1,22 @@
+# Entorno virtual
+venv/
+.env
+
+# Archivos temporales o compilados
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Archivos de datos locales
+*.xlsx
+*.zip
+*.xml
+
+# Configuración local
+.vscode/
+.idea/
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
