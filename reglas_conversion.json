@@ -1,6 +1,3 @@
 {
-  "Granja San Pedro": {"factor": 30, "tipo_objetivo": "Huevo"},
-  "Distribuidora Avícola": {"factor": 1, "tipo_objetivo": "Huevo"},
-  "Lácteos El Prado": {"factor": 1, "tipo_objetivo": "Leche"},
-  "Frutas del Valle": {"factor": 12, "tipo_objetivo": "Unidad"}
+  "PARDO DIAZ IVAN": {"factor": 30, "tipo_objetivo": "Huevo"}
 }
