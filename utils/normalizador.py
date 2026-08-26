@@ -8,7 +8,7 @@ def cargar_diccionario():
         with open(ruta, "r", encoding="utf-8") as f:
             return json.load(f)
     except FileNotFoundError:
-        print("⚠️ No se encontró el archivo de normalización.")
+        print("[AVISO] No se encontró el archivo de normalización.")
         return {}
 
 # Aplica la normalización al nombre del producto

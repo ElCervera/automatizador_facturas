@@ -35,12 +35,12 @@ def cargar_reglas_conversion():
     try:
         with open(ruta_reglas, 'r', encoding='utf-8') as archivo:
             reglas = json.load(archivo)
-            print(f"📋 Reglas cargadas: {len(reglas)} proveedores")
+            print(f"[REGLAS] Reglas cargadas: {len(reglas)} proveedores")
             for proveedor, regla in reglas.items():
                 print(f"   - {proveedor}: factor {regla.get('factor', 1)}")
             return reglas
     except Exception as e:
-        print(f"⚠️ Error cargando reglas: {e}. Usando reglas por defecto.")
+        print(f"[AVISO] Error cargando reglas: {e}. Usando reglas por defecto.")
         return {}
 
 def procesar_xml(ruta_xml):
@@ -52,7 +52,7 @@ def procesar_xml(ruta_xml):
     from datetime import datetime
 
     try:
-        # === 1️⃣ Parsear XML base ===
+        # === [1] Parsear XML base ===
         tree = ET.parse(ruta_xml)
         root = tree.getroot()
 
@@ -71,10 +71,10 @@ def procesar_xml(ruta_xml):
                     # Parsear el XML interno dentro del CDATA
                     root = ET.fromstring(contenido_cdata)
                 except ET.ParseError as e:
-                    print(f"❌ Error parseando XML embebido en {ruta_xml}: {e}")
+                    print(f"[ERROR] Error parseando XML embebido en {ruta_xml}: {e}")
                     return None
 
-        # === 2️⃣ Extraer datos principales ===
+        # === [2] Extraer datos principales ===
         numero_factura = (
             root.findtext('.//cbc:ID', namespaces=NAMESPACES)
             or root.findtext('.//fe:ID', namespaces=NAMESPACES)
@@ -95,7 +95,7 @@ def procesar_xml(ruta_xml):
             except ValueError:
                 fecha_obj = datetime.now()
 
-        # === 3️⃣ Extraer datos del proveedor ===
+        # === [3] Extraer datos del proveedor ===
         posibles_nodos = [
             './/cac:AccountingSupplierParty',
             './/fe:AccountingSupplierParty',
@@ -137,7 +137,7 @@ def procesar_xml(ruta_xml):
         if not nit_proveedor:
             nit_proveedor = "N/A"
 
-        # === 4️⃣ Extraer ítems ===
+        # === [4] Extraer ítems ===
         items = []
         posibles_items = [
             './/cac:InvoiceLine',
@@ -183,10 +183,10 @@ def procesar_xml(ruta_xml):
                         'precio_unitario': precio_unitario  # Mantener para compatibilidad
                     })
                 except Exception as e:
-                    print(f"⚠️ Error leyendo ítem en {os.path.basename(ruta_xml)}: {e}")
+                    print(f"[AVISO] Error leyendo ítem en {os.path.basename(ruta_xml)}: {e}")
 
         if not items:
-            print(f"⚠️ No se encontraron ítems válidos en {os.path.basename(ruta_xml)}")
+            print(f"[AVISO] No se encontraron ítems válidos en {os.path.basename(ruta_xml)}")
             return None
 
         return {
@@ -198,7 +198,7 @@ def procesar_xml(ruta_xml):
         }
 
     except Exception as e:
-        print(f"❌ Error al procesar el archivo {ruta_xml}: {e}")
+        print(f"[ERROR] Error al procesar el archivo {ruta_xml}: {e}")
         return None
 
 def aplicar_reglas_conversion(datos_factura, reglas):
@@ -214,7 +214,7 @@ def aplicar_reglas_conversion(datos_factura, reglas):
     factor = regla_proveedor.get('factor', 1)
     tipo_objetivo = regla_proveedor.get('tipo_objetivo', 'Unidad')
 
-    print(f"🔧 Aplicando reglas a {proveedor}: factor={factor}, tipo={tipo_objetivo}")
+    print(f"[APLICANDO] Aplicando reglas a {proveedor}: factor={factor}, tipo={tipo_objetivo}")
 
     for item in datos_factura['items']:
         cantidad_original = item.get('cantidad_original', item['cantidad'])
@@ -257,14 +257,14 @@ def generar_excel(datos_procesados, ruta_salida):
             factores = df['Factor_Aplicado'].unique()
             proveedores_especiales = df[df['Factor_Aplicado'] != 1]['PROVEEDOR'].unique()
             
-            print(f"📊 RESUMEN DE CONVERSIONES:")
+            print(f"[RESUMEN] RESUMEN DE CONVERSIONES:")
             print(f"   Factores aplicados: {factores}")
             if len(proveedores_especiales) > 0:
                 print(f"   Proveedores con conversión especial: {list(proveedores_especiales)}")
         
         df.to_excel(ruta_salida, index=False)
-        print(f"✅ Archivo Excel generado correctamente en: {ruta_salida}")
+        print(f"[OK] Archivo Excel generado correctamente en: {ruta_salida}")
         return True
     except Exception as e:
-        print(f"❌ Error al generar el archivo Excel: {e}")
+        print(f"[ERROR] Error al generar el archivo Excel: {e}")
         return False

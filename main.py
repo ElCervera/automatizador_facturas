@@ -9,6 +9,10 @@ import shutil
 import datetime
 import re
 import xml.etree.ElementTree as ET
+from utils.database import inicializar_db
+
+# Inicializar base de datos al arrancar
+inicializar_db()
 
 from utils.lector_xml import procesar_xml, aplicar_reglas_conversion, cargar_reglas_conversion
 from utils.optimizador_stock import optimizar_stock
@@ -63,7 +67,7 @@ def extraer_datos_desde_xml(ruta_xml):
             return año, mes_nombre, numero_factura
 
     except Exception as e:
-        print(f"⚠️ Error extrayendo datos del XML {ruta_xml}: {e}")
+        print(f"[AVISO] Error extrayendo datos del XML {ruta_xml}: {e}")
 
     return obtener_datos_desde_nombre(os.path.basename(ruta_xml))
 
@@ -98,7 +102,7 @@ def obtener_datos_desde_nombre(nombre_archivo):
 
 def procesar_archivos_zip(carpeta_zip, carpeta_xml, carpeta_pdf):
     if not os.path.exists(carpeta_zip):
-        print(f"⚠️ Carpeta no encontrada: {carpeta_zip}")
+        print(f"[AVISO] Carpeta no encontrada: {carpeta_zip}")
         return []
 
     os.makedirs(carpeta_xml, exist_ok=True)
@@ -155,10 +159,10 @@ def procesar_archivos_zip(carpeta_zip, carpeta_xml, carpeta_pdf):
             shutil.rmtree(carpeta_temp)
             os.makedirs(carpeta_temp, exist_ok=True)
             os.remove(ruta_zip)
-            print(f"✅ ZIP procesado: {archivo_zip}")
+            print(f"[OK] ZIP procesado: {archivo_zip}")
 
         except Exception as e:
-            print(f"❌ Error procesando {archivo_zip}: {e}")
+            print(f"[ERROR] Error procesando {archivo_zip}: {e}")
 
     shutil.rmtree(carpeta_temp, ignore_errors=True)
     return archivos_xml_procesados
@@ -172,23 +176,29 @@ def procesar_archivos_xml(rutas_xml):
     resultados = []
     for ruta in rutas_xml:
         nombre_archivo = os.path.basename(ruta)
-        print(f"\n🔍 Procesando XML: {nombre_archivo}")
+        print(f"\n[BUSCANDO] Procesando XML: {nombre_archivo}")
         factura = procesar_xml(ruta)
         if factura:
             datos_convertidos = aplicar_reglas_conversion(factura, reglas)
             resultados.extend(datos_convertidos)
         else:
-            print(f"❌ Error al procesar {nombre_archivo}")
+            print(f"[ERROR] Error al procesar {nombre_archivo}")
     return resultados
 
 
 def generar_excel(resultados):
     import pandas as pd
     os.makedirs(CARPETA_RESULTADOS, exist_ok=True)
+    
+    # Filtrar productos excluidos
+    df = pd.DataFrame(resultados)
+    if 'tipo' in df.columns:
+        df = df[~df["tipo"].str.upper().isin(EXCLUIR_PRODUCTOS)]
+    
     fecha_hora = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     ruta_excel = os.path.join(CARPETA_RESULTADOS, f"facturas_consolidadas_{fecha_hora}.xlsx")
-    pd.DataFrame(resultados).to_excel(ruta_excel, index=False)
-    print(f"📊 Excel generado: {ruta_excel}")
+    df.to_excel(ruta_excel, index=False)
+    print(f"[EXCEL] Excel generado: {ruta_excel}")
     return ruta_excel
 
 
@@ -202,38 +212,38 @@ def main():
     carpeta_xml = os.path.join(os.getcwd(), "facturas_xml")
     carpeta_pdf = os.path.join(os.getcwd(), "facturas_pdf")
 
-    # 1️⃣ Procesar ZIPs
+    # [1] Procesar ZIPs
     archivos_procesados = procesar_archivos_zip(carpeta_zip, carpeta_xml, carpeta_pdf)
 
-    # 2️⃣ Buscar XMLs existentes si no se procesaron nuevos
+    # [2] Buscar XMLs existentes si no se procesaron nuevos
     if not archivos_procesados:
-        print("🔍 Buscando XMLs existentes...")
+        print("[BUSCANDO] Buscando XMLs existentes...")
         for root, _, files in os.walk(carpeta_xml):
             for f in files:
                 if f.lower().endswith(".xml"):
                     archivos_procesados.append(os.path.join(root, f))
 
     if not archivos_procesados:
-        print("⚠️ No se encontraron archivos XML.")
+        print("[AVISO] No se encontraron archivos XML.")
         return
 
-    # 3️⃣ Procesar XMLs → generar Excel base
+    # [3] Procesar XMLs → generar Excel base
     resultados = procesar_archivos_xml(archivos_procesados)
     if not resultados:
-        print("⚠️ No se obtuvieron datos válidos.")
+        print("[AVISO] No se obtuvieron datos válidos.")
         return
 
     ruta_excel = generar_excel(resultados)
 
-    # 4️⃣ Optimización de stock
-    print("\n🧠 Ejecutando optimizador de stock...")
+    # [4] Optimización de stock
+    print("\n[OPTIMIZANDO] Ejecutando optimizador de stock...")
     ruta_optimo = optimizar_stock(ruta_excel)
 
-    # 5️⃣ Generar facturas simuladas desde optimización
-    print("\n🧾 Generando facturas simuladas de venta...")
+    # [5] Generar facturas simuladas desde optimización
+    print("\n[FACTURANDO] Generando facturas simuladas de venta...")
     generar_facturas_desde_optimo(ruta_optimo)
 
-    print("\n✅ Proceso completo finalizado correctamente.")
+    print("\n[OK] Proceso completo finalizado correctamente.")
 
 
 if __name__ == "__main__":
