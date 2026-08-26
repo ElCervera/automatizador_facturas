@@ -13,6 +13,7 @@ Proyecto en **Python** que automatiza el procesamiento de **facturas electrónic
   - Tipo  
   - Cantidad  
   - Valor Unitario  
+  python -m streamlit run gui_app.py
 
 ## 📂 Estructura del proyecto
 👨‍💻 Autor

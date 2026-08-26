@@ -1,0 +1,54 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+
+# Entornos virtuales
+.venv/
+venv/
+.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Perfiles de navegador (Selenium)
+.edge_profile/
+.firefox_profile/
+siigo_automation/.edge_profile/
+siigo_automation/.firefox_profile/
+
+# Debug artifacts
+siigo_automation/debug/
+
+# Bases de datos locales
+*.db
+
+# Logs
+*.log
+
+# Datos temporales de siigo_automation
+siigo_automation/data/*.xlsx
+!siigo_automation/data/facturacion.xlsx
+
+# Archivos de facturas procesadas (generados en runtime)
+facturas_pdf/
+facturas_xml/
+facturas_zip/
+
+# Resultados generados (archivos .xlsx en runtime)
+resultados/
+
+# Gemini / Antigravity
+.gemini/
+.agents/

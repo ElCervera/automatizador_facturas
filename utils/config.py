@@ -1,4 +1,5 @@
 # utils/config.py
+import os
 """
 Configuración global del proyecto.
 Centraliza exclusiones y parámetros que usan todos los módulos.
@@ -6,18 +7,17 @@ Centraliza exclusiones y parámetros que usan todos los módulos.
 
 # Exclusiones
 # NITs temporales a excluir (puedes eliminar/comment cuando ya no quieras excluir).
-EXCLUIR_NITS = [
-    "79389881",  # ejemplo Humberto Guerrero (temporal)
-]
+EXCLUIR_NITS = []
 
 # Productos excluidos permanentemente (no vender nunca)
 EXCLUIR_PRODUCTOS = [
     "HUEVO QUEBRADO",
+    "HUEVO ROJO P",
     # Si deseas excluir "HUEVOS" también, agrega aquí.
 ]
 
 # Carpetas/resultados
-CARPETA_RESULTADOS = "resultados"
+CARPETA_RESULTADOS = os.path.join(os.getcwd(), "resultados")
 
 # Parámetros de simulación / optimización
 VENTA_DIARIA_MIN = 5_000_000

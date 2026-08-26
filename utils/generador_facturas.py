@@ -31,13 +31,16 @@ def fragmentar_cantidad_en_facturas(total_qty, min_unit=MIN_HUEVOS, max_unit=MAX
     """
     partes = []
     remaining = int(total_qty)
-    # si remaining < min_unit, devolver [remaining] (remanente) para vender en fase remanente
+    # si remaining <= 0, no hay nada que fragmentar
     if remaining <= 0:
         return partes
 
-    # transform units into multiples
+    # transform units into multiples (redondear al múltiplo más cercano por debajo)
     def to_multiple(x):
-        return max(multiple, (x // multiple) * multiple)
+        # Si x es menor que el múltiplo mínimo, devolvemos el múltiplo mínimo
+        # pero luego validamos contra remaining
+        val = (x // multiple) * multiple
+        return max(multiple, val)
 
     # while remain >= min_unit, create chunks
     while remaining >= min_unit:
@@ -49,26 +52,27 @@ def fragmentar_cantidad_en_facturas(total_qty, min_unit=MIN_HUEVOS, max_unit=MAX
             candidate = min(remaining, int((min_unit + max_unit) / 2))
         else:
             candidate = min(remaining, min_unit)
+        
         candidate = to_multiple(candidate)
-        # safeguard
-        if candidate == 0:
-            break
+        
         # if candidate > remaining, reduce to the largest multiple <= remaining
         if candidate > remaining:
             candidate = (remaining // multiple) * multiple
             if candidate == 0:
+                # Si no queda ni para un múltiplo, salimos para tratar el resto como remanente
                 break
+        
         partes.append(int(candidate))
         remaining -= candidate
 
-    # if small remainder remains (< min_unit), keep as remanente (will be sold in remanentes phase)
+    # Si queda un remanente pequeño (> 0), lo agregamos al final
+    # (Este remanente no será múltiplo de 5 cubetas, lo cual es aceptable según la regla)
     if remaining > 0:
-        # keep as leftover
-        partes.append(int(remaining))  # will be treated as remanente if < min_unit by caller
+        partes.append(int(remaining))
 
     return partes
 
-def generar_facturas_desde_optimo(ruta_stock_optimo):
+def generar_facturas_desde_optimo(ruta_stock_optimo, num_dias_distribucion, numero_inicio=7000):
     """
     Lee stock_optimo_xxx.xlsx y genera facturas distribuidas por días del mes.
     """
@@ -100,6 +104,7 @@ def generar_facturas_desde_optimo(ruta_stock_optimo):
 
     total_global = 0
     todas_facturas = []
+    numero_factura = numero_inicio
 
     for mes, datos_mes in df.groupby('mes'):
         print(f"\nGenerando facturas para {mes}...")
@@ -110,7 +115,11 @@ def generar_facturas_desde_optimo(ruta_stock_optimo):
         month_end = next_month - pd.Timedelta(days=1)
 
         # business days list
-        bdays = pd.bdate_range(start=month_start, end=month_end).to_pydatetime().tolist()
+        all_bdays = pd.bdate_range(start=month_start, end=month_end).to_pydatetime().tolist()
+        # Select num_dias_distribucion unique business days
+        bdays = random.sample(all_bdays, min(num_dias_distribucion, len(all_bdays)))
+        bdays.sort() # Ensure days are in chronological order
+
         # prefer Tue(1) and Fri(4): give them higher weight
         day_weights = []
         for d in bdays:
@@ -122,43 +131,82 @@ def generar_facturas_desde_optimo(ruta_stock_optimo):
         total_w = sum(day_weights)
         day_probs = [w/total_w for w in day_weights]
 
-        facturas_mes = []
-        numero_factura = 7000
-
-        # For each row in datos_mes, fragmenta la cantidad a vender en facturas y asigna días
+        # 1. Generar todas las LINEAS de productos para este mes primero
+        lineas_mes = []
         for _, row in datos_mes.iterrows():
             qty_total = int(row['huevos_a_vender'])
             if qty_total <= 0:
                 continue
             tipo = row['tipo']
             precio_base = float(row['valor unitario'])
-            # fragmenta en facturas (múltiplos)
+            # fragmenta en partes
             partes = fragmentar_cantidad_en_facturas(qty_total, min_unit=MIN_HUEVOS, max_unit=MAX_HUEVOS, multiple=MULTIPLE_HUEVOS)
-            # if last part < MIN_HUEVOS -> that's remanente; we will try to sell in remanente phase
             for p in partes:
-                # if p < MIN_HUEVOS, treat as remanente later; here we still can create a small invoice if business rule allows
-                # choose day weighted by day_probs
                 chosen_day = np.random.choice(bdays, p=day_probs)
                 # margin per egg random 3-5 COP
-                margen = random.randint(3,5)
+                margen = random.randint(3, 5)
                 precio_venta_huevo = precio_base + margen
                 valor_total = p * precio_venta_huevo
-                factura = {
-                    'Fecha': chosen_day.strftime('%d/%m/%Y'),
-                    'N factura': f"LSFE {numero_factura}",
+                linea = {
+                    'Fecha': chosen_day,
                     'Tipo': tipo,
-                    'Precio base (COP/huevo)': round(precio_base,2),
+                    'Precio base (COP/huevo)': round(precio_base, 2),
                     'Huevos vendidos': int(p),
                     'Cubetas vendidas': int(p // 30),
-                    'Precio venta (COP/huevo)': round(precio_venta_huevo,2),
-                    'Precio venta (COP/cubeta)': round(precio_venta_huevo*30,2),
-                    'Valor Total (COP)': round(valor_total,2),
+                    'Precio venta (COP/huevo)': round(precio_venta_huevo, 2),
+                    'Precio venta (COP/cubeta)': round(precio_venta_huevo * 30, 2),
+                    'Valor Total (COP)': round(valor_total, 2),
                     'ID_Stock': int(row['id'])
                 }
-                facturas_mes.append(factura)
-                todas_facturas.append(factura)
-                numero_factura += 1
-                total_global += valor_total
+                lineas_mes.append(linea)
+
+        # 2. AGRUPAR LINEAS EN FACTURAS (1-3 productos, max 3M, no repetir tipo)
+        facturas_mes = []
+        df_lineas = pd.DataFrame(lineas_mes)
+        if not df_lineas.empty:
+            # Agrupar por fecha
+            for fecha, group in df_lineas.groupby('Fecha'):
+                items_dia = group.to_dict('records')
+                random.shuffle(items_dia)
+                
+                while items_dia:
+                    # Intentar armar una factura con 1-3 productos
+                    n_objetivo = random.randint(1, 3)
+                    factura_actual_items = []
+                    tipos_en_factura = set()
+                    valor_factura_actual = 0
+                    
+                    # Intentar agregar hasta n_objetivo items
+                    i = 0
+                    while i < len(items_dia) and len(factura_actual_items) < n_objetivo:
+                        item = items_dia[i]
+                        # Reglas: no repetir tipo y no pasar de 3M COP
+                        if item['Tipo'] not in tipos_en_factura and (valor_factura_actual + item['Valor Total (COP)']) <= 3_000_000:
+                            factura_actual_items.append(items_dia.pop(i))
+                            tipos_en_factura.add(item['Tipo'])
+                            valor_factura_actual += item['Valor Total (COP)']
+                        else:
+                            i += 1
+                    
+                    # Si no pudimos agregar nada más pero aún quedan items, 
+                    # cerramos esta factura y pasamos a la siguiente. 
+                    # Si no se pudo agregar ni uno solo (ej: el item individual > 3M), 
+                    # forzamos el primero para no entrar en loop infinito.
+                    if not factura_actual_items and items_dia:
+                        factura_actual_items.append(items_dia.pop(0))
+                        valor_factura_actual = factura_actual_items[0]['Valor Total (COP)']
+                    
+                    if factura_actual_items:
+                        id_factura_str = f"LSFE {numero_factura}"
+                        fecha_str = fecha.strftime('%d/%m/%Y')
+                        for it in factura_actual_items:
+                            it['N factura'] = id_factura_str
+                            it['Fecha'] = fecha_str
+                            facturas_mes.append(it)
+                            todas_facturas.append(it)
+                        
+                        numero_factura += 1
+                        total_global += valor_factura_actual
 
         # AFTER processing all rows: write sheet
         df_out = pd.DataFrame(facturas_mes)
