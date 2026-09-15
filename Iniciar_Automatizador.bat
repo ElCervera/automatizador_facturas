@@ -11,18 +11,17 @@ echo ===================================================
 echo.
 
 :: Verificar existencia del entorno virtual
-if exist "venv\Scripts\activate.bat" (
-    echo [OK] Entorno virtual detectado. Activando venv...
-    call venv\Scripts\activate.bat
+if exist "venv\Scripts\python.exe" (
+    echo [OK] Entorno virtual detectado en 'venv'.
+    echo [INFO] Lanzando interfaz grafica en Streamlit...
+    echo.
+    "%~dp0venv\Scripts\python.exe" -m streamlit run gui_app.py
 ) else (
     echo [ADVERTENCIA] No se detecto el directorio 'venv'.
     echo Se intentara ejecutar usando el Python global del sistema.
     echo.
+    python -m streamlit run gui_app.py
 )
-
-echo [INFO] Lanzando interfaz grafica en Streamlit...
-echo.
-python -m streamlit run gui_app.py
 
 if %ERRORLEVEL% NEQ 0 (
     echo.
