@@ -2,10 +2,10 @@ import json
 from datetime import datetime
 from pathlib import Path
 from typing import Any
-
+# pyrefly: ignore [missing-import]
 from selenium.webdriver.common.by import By
+# pyrefly: ignore [missing-import]
 from selenium.webdriver.remote.webdriver import WebDriver
-
 from siigo_automation.config.settings import DEBUG_DIR
 
 

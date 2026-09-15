@@ -1,7 +1,10 @@
+# pyrefly: ignore [missing-import]
 from selenium.common.exceptions import TimeoutException
+# pyrefly: ignore [missing-import]
 from selenium.webdriver.common.by import By
+# pyrefly: ignore [missing-import]
 from selenium.webdriver.remote.webdriver import WebDriver
-from selenium.webdriver.support import expected_conditions as EC
+# pyrefly: ignore [missing-import]
 from selenium.webdriver.support.ui import WebDriverWait
 
 from siigo_automation.utils.flutter_semantics import ensure_semantics_enabled

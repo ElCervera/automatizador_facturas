@@ -2,13 +2,19 @@ import os
 import shutil
 import sys
 from pathlib import Path
-
-from selenium import webdriver
+# pyrefly: ignore [missing-import]
+from selenium import webdriver  
+# pyrefly: ignore [missing-import]
 from selenium.webdriver.edge.options import Options as EdgeOptions
+# pyrefly: ignore [missing-import]
 from selenium.webdriver.edge.service import Service as EdgeService
+# pyrefly: ignore [missing-import]
 from selenium.webdriver.firefox.options import Options as FirefoxOptions
+# pyrefly: ignore [missing-import]
 from selenium.webdriver.firefox.service import Service as FirefoxService
+# pyrefly: ignore [missing-import]
 from webdriver_manager.microsoft import EdgeChromiumDriverManager
+# pyrefly: ignore [missing-import]
 from webdriver_manager.firefox import GeckoDriverManager
 
 from siigo_automation.config import settings

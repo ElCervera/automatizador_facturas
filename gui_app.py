@@ -3,6 +3,7 @@ import os
 import time
 import shutil
 import pandas as pd
+# pyrefly: ignore [missing-import]
 import streamlit as st
 import traceback
 from datetime import datetime
@@ -35,9 +36,11 @@ st.set_page_config(
 
 # Intentar importar dependencias de visualización
 try:
+    # pyrefly: ignore [missing-import]
     import plotly.express as px
     HAS_PLOTLY = True
 except ImportError:
+    # pyrefly: ignore [missing-import]
     import altair as alt
     HAS_PLOTLY = False
 
